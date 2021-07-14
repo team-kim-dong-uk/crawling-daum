@@ -21,6 +21,7 @@ def downloadImg(urls, article_no, hashtags):
     index = 0
     for url in urls:
         name = article_no + '-' + '_'.join(hashtags) + '-' + str(index)
+        name = name.replace("/", "")
         index += 1
         try:
             urllib.request.urlretrieve(url, os.getcwd() + "/stored/images/" + name + ".jpg")
@@ -43,8 +44,8 @@ def login():
     driver.find_element_by_class_name('submit').click()
     time.sleep(2)
 
-def move_page(url, prevPage):
-    print('move to page')
+def move_page(prevPage):
+    print('move to List page')
     driver.get(prevPage)
 
     html = driver.page_source
@@ -54,21 +55,19 @@ def move_page(url, prevPage):
     nexPage = 1
     for x in paging.children:
         if hasattr(x, 'attrs'):
+            # 'sr_only' = 현재 페이지
             if 'sr_only' in x.attrs['class']:
                 break
             else:
                 nexPage += 1
     if nexPage == 5:
-        #temp = driver.find_elements_by_xpath("//*[@class='btn_next' and @class='btn_page']")
-        temp = driver.find_element_by_xpath('//a[contains(@class, "btn_page") and contains(@class, "btn_next")]').click()
-
-        #page.find('a', class_='btn_next').click()
+        # 마지막 페이지, 옆으로 버튼 클릭
+        driver.find_element_by_xpath('//a[contains(@class, "btn_page") and contains(@class, "btn_next")]').click()
     else:
-        pages = driver.find_elements_by_class_name('link_page')[nexPage].click()
-
-        #page.findAll('a', class_='link_page')[nexPage].click()
+        driver.find_elements_by_class_name('link_page')[nexPage].click()
     time.sleep(2)
 
+    # 게시글 순회 후 빠져나올 페이지
     return driver.current_url
 
 def get_articles(curr_driver):
@@ -82,6 +81,7 @@ def get_articles(curr_driver):
 def get_article_data(article_driver, root_url, article_no):
     url = root_url + '/' + article_no
     article_driver.get(url)
+
     time.sleep(3)
     data = {}
     html = article_driver.page_source
@@ -105,7 +105,8 @@ def get_article_data(article_driver, root_url, article_no):
     except:
         print('no text')
         data['text'] = ''
-    data['media_url'] =[ x.attrs['src'] for x in contents.findAll('img') ]
+
+    data['media_url'] = [x.attrs['src'] for x in contents.findAll('img')]
 
     downloadImg(data['media_url'], article_no, data['hashtags'])
     # return data
@@ -123,12 +124,13 @@ def main():
     page = START
 
     login()
-
-    photo_board = 'https://m.cafe.daum.net/-ohmygirl/XtXW?prev_page=2&firstbbsdepth=00368&lastbbsdepth=0035j&page=1'
+    # 시작 페이지
+    list_page = 'https://m.cafe.daum.net/-ohmygirl/XtXW?prev_page=2&firstbbsdepth=00368&lastbbsdepth=0035j&page=1'
+    photo_board = 'https://m.cafe.daum.net/-ohmygirl/XtXW/'
     driver.get(photo_board)
     time.sleep(2)
 
-    prevPage = photo_board
+    prevPage = list_page
     result = []
     try:
         while page <= END:
@@ -136,11 +138,10 @@ def main():
             for x in articles:
                 # move to article page and get data
                 article_no = x.attrs['href'].split("/")[-1]
-
-                #result.append(get_article_data(driver, photo_board, article_no))
+                result.append(get_article_data(driver, photo_board, article_no))
 
             page += 1
-            prevPage = move_page(photo_board, prevPage)
+            prevPage = move_page(prevPage)
 
     except KeyboardInterrupt:
         makejson(result, START,page)
