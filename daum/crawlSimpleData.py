@@ -6,12 +6,22 @@ import time
 import json, os
 import urllib.request
 
+
+"""
+{
+    title: 제목, 
+    upload_date: 업로드 날짜, 
+    view_count: 조회수, 
+    crawled_date: 크롤링 시각
+}
+을 얻기 위한 코드.
+"""
 driver = webdriver.Chrome('../driver/chromedriver')
 START = 1
 END = 250
 IMG_PATH = os.getcwd() + "/stored/images/"
 CAFE_LOGIN_PAGE = 'https://accounts.kakao.com/login?continue=https%3A%2F%2Flogins.daum.net%2Faccounts%2Fksso.do%3Frescue%3Dtrue%26url%3Dhttp%253A%252F%252Fm.cafe.daum.net%252F-ohmygirl%252F_newmember%253Fnull'
-
+BASE_URL = 'https://m.cafe.daum.net/-ohmygirl/XtXW/'
 
 def downloadImg(urls, article_no, hashtags):
     # 이미 다운받은 이미지인 경우
@@ -80,52 +90,50 @@ def move_page(prevPage):
     # 게시글 순회 후 빠져나올 페이지, 이게 다음의 prev_page가 된다.
     return driver.current_url
 
-# 현재 페이지에서 보이는 게시글들의 url을 가져오는 함수
+# 현재 페이지에서 보이는 게시글들을 가져오는 함수
 def get_articles(curr_driver):
     html = curr_driver.page_source
     page = BeautifulSoup(html, 'lxml')
-    data = page.findAll('a', class_='#article_list')
-
+    data = page.findAll('li', class_='thumbnail_on')
     return data
 
 
-def get_article_data(article_driver, url):
-    # 해당 게시글로 이동
-    article_driver.get(url)
-    time.sleep(3)
-
-    html = article_driver.page_source
-    page = BeautifulSoup(html, 'html.parser')
-
+def parse_article_data(article_data):
     data = {}
+
+    body = article_data.find('a', class_='#article_list')
+    article_no = body.attrs['href'].split("/")[-1]
+
+    if article_no in imgList:
+        print("%s는 이미 확인 및 다운로드 했읍니다." % article_no)
+        raise KeyboardInterrupt
+
     data['id'] = article_no
+    data['url'] = BASE_URL + '/' + article_no
+    data['title'] = body.find('span', class_='txt_detail').text.strip()  # 제목
 
-    subject = page.find('h3', class_='tit_subject').text.strip()
-    data['subject'] = subject
-    data['hashtags'] = subject.split(" ")
-    data['url'] = url
+    uploaded_date = body.find('span', class_='created_at').text.strip()
+    if '.' not in uploaded_date:
+        uploaded_date = str(datetime.now()).split(" ")[0]
+    else:
+        uploaded_date  = uploaded_date.replace('.', '-', 2)
+    data['uploaded_date'] = uploaded_date  # 업로드 날짜
 
-    created_at = page.find('span', class_='num_subject').text.strip()
-    if '.' not in created_at:
-        created_at = str(datetime.now()).split(" ")[0]
-    data['created_at'] = created_at
+    data['crawled_date'] = str(datetime.now()).split(" ")[0]  # 크롤링 시점
+    #data['recommended_count'] = article_data.find('span', class_='tbl_txt_recommend')  # 추천 수
+    data['view_count'] = int(article_data.find('span', class_='view_count').text.strip())  # 조회수
 
-    contents = page.find('div', id='article')
-    try:
-        data['text'] = contents.find('p').text
-    except:
-        print('no text')
-        data['text'] = ''
+    commentPart = article_data.find('a', class_='#comment_view')
+    data['comment_count'] = int(commentPart.find('span', class_='num_cmt').text.strip()) # 댓글 수
 
-    # 이미지 url
-    data['media_url'] = [x.attrs['src'] for x in contents.findAll('img')]
-
-    downloadImg(data['media_url'], article_no, data['hashtags'])
+    print(data)
 
     return data
 
-def make_json(result, start, page):
+def make_json(result, start, page, sortBy):
+    result = sorted(result, key=lambda x: x[sortBy], reverse=True)
     json_data = json.dumps(result, ensure_ascii=False)
+
     filename = str(datetime.now()).split(".")[0] + '-page-' + str(start) + '-' + str(page - 1)
     file = open("./jsonOutput/" + filename + ".json", "w")
     file.write(json_data)
@@ -133,7 +141,7 @@ def make_json(result, start, page):
 
 def main():
     page = START
-
+    sortBy = 'view_count'
     login()
     # 시작 페이지
     photo_board = 'https://m.cafe.daum.net/-ohmygirl/XtXW/'
@@ -147,26 +155,16 @@ def main():
         while page <= END:
             articles = get_articles(driver)
             for x in articles:
-                # move to article page and get data
-                article_no = x.attrs['href'].split("/")[-1]
-                # 이미지의 전체 데이터!
-                url = photo_board + '/' + article_no
-                result.append(get_article_data(driver, url))
+                result.append(parse_article_data(x))
 
             page += 1
             prev_page = move_page(prev_page)
 
     except KeyboardInterrupt:
-        make_json(result, START,page)
+        make_json(result, START,page, sortBy)
         exit()
 
-    make_json(result, START,page)
-
-
-
-
-
-
+    make_json(result, START,page, sortBy)
 
 downloadedImg = []
 path = os.getcwd() + '/stored/images'
