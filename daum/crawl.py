@@ -162,12 +162,9 @@ def main():
 
     make_json(result, START,page)
 
-
-
-
-
-
-
+"""
+기존에 다운받은 이미지 들고와서 중복 처리 안하게끔하기
+"""
 downloadedImg = []
 path = os.getcwd() + '/stored/images'
 file_list = os.listdir(path)

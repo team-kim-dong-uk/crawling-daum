@@ -131,10 +131,12 @@ def parse_article_data(article_data):
     return data
 
 def make_json(result, start, page, sortBy):
+    startId = result[0]['id']
+    lastId = result[-1]['id']
     result = sorted(result, key=lambda x: x[sortBy], reverse=True)
     json_data = json.dumps(result, ensure_ascii=False)
 
-    filename = str(datetime.now()).split(".")[0] + '-page-' + str(start) + '-' + str(page - 1)
+    filename = str(datetime.now()).split(".")[0] + '-id-' + startId + '-' + lastId
     file = open("./jsonOutput/" + filename + ".json", "w")
     file.write(json_data)
     file.close()
@@ -166,6 +168,10 @@ def main():
 
     make_json(result, START,page, sortBy)
 
+
+"""
+기존에 다운받은 이미지 들고와서 중복 처리 안하게끔하기
+"""
 downloadedImg = []
 path = os.getcwd() + '/stored/images'
 file_list = os.listdir(path)
