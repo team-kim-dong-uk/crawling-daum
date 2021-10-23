@@ -23,33 +23,6 @@ IMG_PATH = os.getcwd() + "/stored/images/"
 CAFE_LOGIN_PAGE = 'https://accounts.kakao.com/login?continue=https%3A%2F%2Flogins.daum.net%2Faccounts%2Fksso.do%3Frescue%3Dtrue%26url%3Dhttp%253A%252F%252Fm.cafe.daum.net%252F-ohmygirl%252F_newmember%253Fnull'
 BASE_URL = 'https://m.cafe.daum.net/-ohmygirl/XtXW/'
 
-def downloadImg(urls, article_no, hashtags):
-    # 이미 다운받은 이미지인 경우
-    if article_no in imgList:
-        print('%s in img' % article_no)
-        return
-
-    # 현재 페이지에 이미지가 몇개 있나 프린트
-    try:
-        print("id - %s , url length - %d" %(article_no, len(urls)))
-    except:
-        pass
-
-    index = 0
-    for media_url in urls:
-        # 이미지 이름 - 게시글 넘버 , 게시글 제목 단어, 사진 번호
-        name = article_no + '-' + '_'.join(hashtags) + '-' + str(index)
-        name = name.replace("/", "") # 파일 이름에 / 포함되면 디렉토리 에러 남.
-        index += 1
-        try:
-            urllib.request.urlretrieve(media_url, IMG_PATH + name + ".jpg")
-            print(name)
-        except Exception as e:
-            print(e)
-            pass
-
-        time.sleep(0.3)
-
 def login():
     config = configparser.ConfigParser()
     config.read('./daum_config.ini')
@@ -104,7 +77,7 @@ def parse_article_data(article_data):
     body = article_data.find('a', class_='#article_list')
     article_no = body.attrs['href'].split("/")[-1]
 
-    if article_no in imgList:
+    if article_no == lastIdForCheck:
         print("%s는 이미 확인 및 다운로드 했읍니다." % article_no)
         raise KeyboardInterrupt
 
@@ -131,6 +104,8 @@ def parse_article_data(article_data):
     return data
 
 def make_json(result, start, page, sortBy):
+    if len(result) == 0:
+        return
     startId = result[0]['id']
     lastId = result[-1]['id']
     result = sorted(result, key=lambda x: x[sortBy], reverse=True)
@@ -173,13 +148,15 @@ def main():
 기존에 다운받은 이미지 들고와서 중복 처리 안하게끔하기
 """
 downloadedImg = []
-path = os.getcwd() + '/stored/images'
+path = os.getcwd() + '/jsonOutput'
 file_list = os.listdir(path)
-file_list_py = [file for file in file_list]
+file_list.sort()
+json_file = file_list[-1]
 
-imgList = []
-for name in file_list_py:
-    splitedName = name.split("-")[0]
-    if splitedName not in imgList:
-        imgList.append(splitedName)
+with open(path + '/' + json_file, 'r') as f:
+    json_file = json.load(f)
+
+json_file = sorted(json_file, key=lambda x: int(x['id']))
+lastIdForCheck = json_file[-1]['id']
+
 main()
